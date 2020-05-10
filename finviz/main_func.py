@@ -1,11 +1,13 @@
 from finviz.helper_functions.request_functions import http_request_get
 from finviz.helper_functions.scraper_functions import get_table
+import pandas as pd
 
 import datetime
 
 STOCK_URL = 'https://finviz.com/quote.ashx'
 NEWS_URL = 'https://finviz.com/news.ashx'
 CRYPTO_URL = 'https://finviz.com/crypto_performance.ashx'
+MAIN_URL = "https://finviz.com"
 STOCK_PAGE = {}
 
 
@@ -14,6 +16,55 @@ def get_page(ticker):
 
     if ticker not in STOCK_PAGE:
         STOCK_PAGE[ticker], _ = http_request_get(url=STOCK_URL, payload={'t': ticker}, parse=True)
+
+def top_stocks():
+    page_parsed,__ = http_request_get(url=MAIN_URL, payload={}, parse=True)
+    def get_df(tblIndex):    
+        table = page_parsed.cssselect('table[class="t-home-table"]')[tblIndex]
+        rows = [row.xpath('td//text()') for row in table]
+        #print(rows)
+        headers = rows.pop(0)
+        df = pd.DataFrame(rows, columns=headers)
+        return df
+    combined = get_df(0).append(get_df(1), ignore_index=True)
+    return combined
+    #print(combined)
+
+def signals():
+    signals={}
+    for tblindx in [2,3]:
+        page_parsed,__ = http_request_get(url=MAIN_URL, payload={}, parse=True)
+        table = page_parsed.cssselect('table[class="t-home-table"]')[2]
+        rows = [row.xpath('td//text()') for row in table]
+        rows.pop(0)    
+        for row in rows:
+            signals[row[-1]]=row[:-1]
+    #print(signals)
+    return signals
+
+def major_news():
+    page_parsed,__ = http_request_get(url=MAIN_URL, payload={}, parse=True)
+    table = page_parsed.cssselect('table[class="t-home-table"]')[4]
+    rows = [row.xpath('td//text()') for row in table]
+    headers = rows.pop(0)
+    df = pd.DataFrame(rows, columns=headers)
+    return df
+
+def stock_in_news():
+    page_parsed,__ = http_request_get(url=MAIN_URL, payload={}, parse=True)
+    table = page_parsed.cssselect('table[class="t-home-table"]')[5]
+    rows = [row.xpath('td//text()') for row in table]
+    ticks=rows[0]
+    stocks = [x for x in ticks if x not in ['\n','Major news',' ','\xa0']]
+    stock_in_news ={}
+    for i,stock in enumerate(stocks):
+        if i == 0 or i%2==0:
+            #print(stocks[i])
+            stock_in_news[stocks[i]] =stocks[i+1]
+    return stock_in_news
+
+
+
 
 
 def get_stock(ticker):
@@ -155,3 +206,6 @@ def get_analyst_price_targets(ticker, last_ratings=5):
         pass
 
     return analyst_price_targets
+
+if __name__ == "__main__":
+    print(stock_in_news())
